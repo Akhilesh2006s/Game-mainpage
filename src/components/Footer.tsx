@@ -11,10 +11,10 @@ export default function Footer() {
           {/* Logo and Copyright */}
           <div className="text-center md:text-left">
             <span className="font-display text-xl font-bold text-gradient">
-              Global Go Game
+              Global Go League
             </span>
             <p className="mt-2 text-sm text-muted-foreground font-body">
-              © {currentYear} Global Go Game. All rights reserved.
+              © {currentYear} Global Go League. All rights reserved.
             </p>
           </div>
 

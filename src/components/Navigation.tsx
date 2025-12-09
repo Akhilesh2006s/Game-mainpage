@@ -48,10 +48,10 @@ export default function Navigation() {
             className="flex items-center gap-2"
           >
             <span className="font-display text-xl md:text-2xl font-bold text-gradient">
-              GGG
+              GGL
             </span>
             <span className="hidden sm:inline font-display text-sm md:text-base font-medium text-foreground/80">
-              Global Go Game
+              Global Go League
             </span>
           </a>
 

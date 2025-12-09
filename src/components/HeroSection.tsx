@@ -35,7 +35,7 @@ export default function HeroSection() {
 
           {/* Title */}
           <h1 className="section-title text-5xl md:text-6xl lg:text-7xl xl:text-8xl mb-6 animate-fade-in">
-            <span className="text-gradient">Global Go Game</span>
+            <span className="text-gradient">Global Go League</span>
           </h1>
 
           {/* Tagline */}
