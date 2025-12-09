@@ -61,8 +61,14 @@ export default function HeroSection() {
             style={{ animationDelay: '0.6s' }}
           >
             <button className="btn-primary group">
-              <span className="relative z-10">Play Now</span>
-            </button>
+            <a 
+  href="https://games-frontend-vlp4.vercel.app" 
+  target="_blank" 
+  rel="noopener noreferrer"
+  className="relative z-10"
+>
+  Play Now
+</a>            </button>
           </div>
 
           {/* Scroll indicator */}
