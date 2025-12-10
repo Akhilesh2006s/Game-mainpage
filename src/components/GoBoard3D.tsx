@@ -1,6 +1,6 @@
 import { useRef, useMemo } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { Float, Environment } from '@react-three/drei';
+import { Float } from '@react-three/drei';
 import * as THREE from 'three';
 
 const BOARD_SIZE = 19;
@@ -199,8 +199,6 @@ export default function GoBoard3D() {
         <pointLight position={[5, 5, 5]} intensity={0.3} color="#a855f7" />
         
         <Board />
-        
-        <Environment preset="city" />
       </Canvas>
     </div>
   );
