@@ -282,6 +282,20 @@ const MatchingPennies = () => {
     });
     socket.on('game:error', handleError);
     
+    // Listen for server timer updates (like Game of Go)
+    const handleTimerUpdate = (payload) => {
+      if (payload.timeRemaining !== undefined) {
+        // Only update if player hasn't locked their choice
+        if (!lockedChoice) {
+          setTimeRemaining(payload.timeRemaining);
+        } else {
+          // Clear timer when choice is locked
+          setTimeRemaining(null);
+        }
+      }
+    };
+    socket.on('penniesTimerUpdate', handleTimerUpdate);
+
     // Handle game ended (from resign)
     const handleGameEnded = (payload) => {
       if (payload.game) {
@@ -403,6 +417,7 @@ const MatchingPennies = () => {
       socket.off('rematch:rejected', handleRematchRejected);
       socket.off('game:player_disconnected', handlePlayerDisconnected);
       socket.off('game:ended', handlePlayerDisconnected);
+      socket.off('penniesTimerUpdate', handleTimerUpdate);
     };
   }, [currentGame?.guest, refreshGameDetails, setStatusMessage, setCurrentGame, socket, isHost, currentGame, selectedGameType, setSelectedGameType, lockedChoice]);
 
