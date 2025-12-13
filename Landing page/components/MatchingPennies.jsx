@@ -35,6 +35,8 @@ const MatchingPennies = () => {
   const timeRemainingRef = useRef(null);
   const timerStartedRef = useRef(false);
   const lastRoundNumberRef = useRef(null);
+  const countdownIntervalRef = useRef(null);
+  const timerStartTimeRef = useRef(null);
   const [rematchModal, setRematchModal] = useState({ isOpen: false, opponentName: '', requesterId: null, gameType: null, gameSettings: null });
   const [disconnectModal, setDisconnectModal] = useState({ isOpen: false, playerName: '' });
   const { socket, isConnected, isJoined } = useSocket({
@@ -134,20 +136,55 @@ const MatchingPennies = () => {
     setOpponentStatus('Waiting for a challenger to enter your code.');
   }, [currentGame, isHost, result?.isGameComplete]);
 
-  // Listen for server timer updates (like Game of Go)
+  // Client-side countdown timer that starts at 20 and counts down every second
+  useEffect(() => {
+    if (timeRemaining === null || lockedChoice || result) {
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+        countdownIntervalRef.current = null;
+      }
+      timerStartTimeRef.current = null;
+      return;
+    }
+
+    // Start countdown if timer is set and we haven't started yet
+    if (timeRemaining > 0 && !countdownIntervalRef.current && timerStartTimeRef.current === null) {
+      timerStartTimeRef.current = Date.now();
+      const initialTime = timeRemaining;
+      
+      countdownIntervalRef.current = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - timerStartTimeRef.current) / 1000);
+        const remaining = Math.max(0, initialTime - elapsed);
+        setTimeRemaining(remaining);
+        
+        if (remaining <= 0) {
+          if (countdownIntervalRef.current) {
+            clearInterval(countdownIntervalRef.current);
+            countdownIntervalRef.current = null;
+          }
+          timerStartTimeRef.current = null;
+        }
+      }, 100);
+    }
+
+    return () => {
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+        countdownIntervalRef.current = null;
+      }
+    };
+  }, [timeRemaining, lockedChoice, result]);
+
+  // Listen for server timer updates to sync initial time
   useEffect(() => {
     if (!socket) return;
 
     const handleTimerUpdate = (payload) => {
-      if (payload.timeRemaining !== undefined) {
-        // Only update if player hasn't locked their choice
-        if (!lockedChoice) {
-          // Ensure timer is always a valid number and round to nearest integer
-          const time = Math.max(0, Math.floor(payload.timeRemaining));
-          setTimeRemaining(time);
-        } else {
-          // Clear timer when choice is locked
-          setTimeRemaining(null);
+      if (payload.timeRemaining !== undefined && !lockedChoice) {
+        // Only sync initial time from server, then let client-side countdown handle it
+        const serverTime = Math.max(0, Math.floor(payload.timeRemaining));
+        if (timerStartTimeRef.current === null && serverTime > 0) {
+          setTimeRemaining(serverTime);
         }
       }
     };
@@ -186,8 +223,14 @@ const MatchingPennies = () => {
       // Notify server that round has started (server will send timer updates)
       if (socket && currentGame?.code) {
         timerStartedRef.current = true;
-        // Set initial timer to 20 to show immediately, server will update it
-        setTimeRemaining(currentGame.penniesTimePerMove);
+        // Clear any existing countdown
+        if (countdownIntervalRef.current) {
+          clearInterval(countdownIntervalRef.current);
+          countdownIntervalRef.current = null;
+        }
+        timerStartTimeRef.current = null;
+        // Set initial timer to 20 to show immediately
+        setTimeRemaining(currentGame.penniesTimePerMove || 20);
         // Small delay to ensure previous round timer is cleared on server
         const timerId = setTimeout(() => {
           socket.emit('startRound', { code: currentGame.code, gameType: 'MATCHING_PENNIES' });
@@ -197,6 +240,11 @@ const MatchingPennies = () => {
     } else if (result || lockedChoice) {
       // Clear timer when result is shown or choice is locked
       setTimeRemaining(null);
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+        countdownIntervalRef.current = null;
+      }
+      timerStartTimeRef.current = null;
     }
   }, [currentGame?.penniesTimePerMove, lockedChoice, result, isJoined, currentGame?.status, socket, currentGame?.code, currentGame?.penniesRoundNumber]);
 
@@ -217,6 +265,12 @@ const MatchingPennies = () => {
       setTimeRemaining(null);
       // Clear the last round number so next round can start fresh
       lastRoundNumberRef.current = null;
+      // Clear countdown interval
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+        countdownIntervalRef.current = null;
+      }
+      timerStartTimeRef.current = null;
       
       // Update rounds played from payload
       if (payload.roundsPlayed !== undefined) {
@@ -520,11 +574,10 @@ const MatchingPennies = () => {
       {/* Exit Game Button - Top Right Corner */}
       <button
         onClick={handleExitGame}
-        className="fixed top-6 right-6 z-[100] rounded-lg border-2 border-red-500/70 bg-red-500/30 px-5 py-2.5 text-sm font-bold text-white hover:bg-red-500/50 hover:border-red-500 transition shadow-xl backdrop-blur-sm"
+        className="absolute top-2 right-2 z-[9999] rounded-lg border-2 border-red-500 bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-700 hover:border-red-400 transition shadow-2xl"
         title="Exit Game"
-        style={{ position: 'fixed' }}
       >
-        ✕ Exit Game
+        ✕ Exit
       </button>
       <header>
         <div className="flex items-center justify-between">
