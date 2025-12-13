@@ -33,6 +33,7 @@ const MatchingPennies = () => {
   const [roundsPlayed, setRoundsPlayed] = useState(0);
   const [timeRemaining, setTimeRemaining] = useState(null);
   const timeRemainingRef = useRef(null);
+  const timerStartedRef = useRef(false);
   const [rematchModal, setRematchModal] = useState({ isOpen: false, opponentName: '', requesterId: null, gameType: null, gameSettings: null });
   const [disconnectModal, setDisconnectModal] = useState({ isOpen: false, playerName: '' });
   const { socket, isConnected, isJoined } = useSocket({
@@ -136,17 +137,24 @@ const MatchingPennies = () => {
   useEffect(() => {
     if (!currentGame?.penniesTimePerMove || currentGame.penniesTimePerMove === 0) {
       setTimeRemaining(null);
+      timerStartedRef.current = false;
       return;
     }
 
     // Start timer from first round (READY status) or when game is in progress
     if (!lockedChoice && !result && isJoined && (currentGame.status === 'IN_PROGRESS' || currentGame.status === 'READY')) {
       // Notify server that round has started (server will send timer updates)
-      if (socket && currentGame?.code && !lockedChoice) {
+      // Only emit once per round to prevent multiple timer starts
+      if (socket && currentGame?.code && !lockedChoice && !timerStartedRef.current) {
+        timerStartedRef.current = true;
         socket.emit('startRound', { code: currentGame.code, gameType: 'MATCHING_PENNIES' });
       }
     } else {
       setTimeRemaining(null);
+      // Reset flag when round ends or choice is locked
+      if (result || lockedChoice) {
+        timerStartedRef.current = false;
+      }
     }
   }, [currentGame?.penniesTimePerMove, lockedChoice, result, isJoined, currentGame?.status, socket, currentGame?.code]);
 
@@ -157,6 +165,7 @@ const MatchingPennies = () => {
       setResult(payload);
       setLockedChoice('');
       setOpponentLock('');
+      timerStartedRef.current = false; // Reset timer flag when round ends
       setScores({
         host: payload.hostScore || 0,
         guest: payload.guestScore || 0,
