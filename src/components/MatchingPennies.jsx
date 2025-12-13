@@ -140,12 +140,18 @@ const MatchingPennies = () => {
     }
 
     // Start timer from first round (READY status) or when game is in progress
+    // Also restart timer when result is cleared (new round ready)
     if (!lockedChoice && !result && isJoined && (currentGame.status === 'IN_PROGRESS' || currentGame.status === 'READY')) {
       // Notify server that round has started (server will send timer updates)
       if (socket && currentGame?.code && !lockedChoice) {
-        socket.emit('startRound', { code: currentGame.code, gameType: 'MATCHING_PENNIES' });
+        // Small delay to ensure previous round timer is cleared
+        const timerId = setTimeout(() => {
+          socket.emit('startRound', { code: currentGame.code, gameType: 'MATCHING_PENNIES' });
+        }, 100);
+        return () => clearTimeout(timerId);
       }
-    } else {
+    } else if (result || lockedChoice) {
+      // Clear timer when result is shown or choice is locked
       setTimeRemaining(null);
     }
   }, [currentGame?.penniesTimePerMove, lockedChoice, result, isJoined, currentGame?.status, socket, currentGame?.code]);
@@ -210,6 +216,10 @@ const MatchingPennies = () => {
             }
             return prevMsg;
           });
+          // Restart timer for next round after result is cleared
+          if (socket && currentGame?.code && currentGame?.penniesTimePerMove && currentGame.penniesTimePerMove > 0) {
+            socket.emit('startRound', { code: currentGame.code, gameType: 'MATCHING_PENNIES' });
+          }
         }, 3000);
         
         // Store timeout ID to clear if needed
