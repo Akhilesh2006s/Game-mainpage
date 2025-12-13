@@ -435,6 +435,44 @@ const MatchingPennies = () => {
     socket.emit('submitPenniesMove', { code: currentGame.code, choice });
   };
 
+  const handleExitGame = async () => {
+    if (!currentGame?.code) {
+      resetGame();
+      setSelectedGameType(null);
+      navigate('/arena', { replace: true });
+      return;
+    }
+
+    if (currentGame.status === 'COMPLETE') {
+      resetGame();
+      setSelectedGameType(null);
+      navigate('/arena', { replace: true });
+      return;
+    }
+
+    const confirmExit = window.confirm('Are you sure you want to exit the game? The game will be completed and your opponent will win.');
+    if (!confirmExit) return;
+
+    try {
+      // End the game via API
+      await api.post('/end-game', { code: currentGame.code });
+      // Reset game state
+      resetGame();
+      setSelectedGameType(null);
+      setResult(null);
+      setScores({ host: 0, guest: 0 });
+      setRoundsPlayed(0);
+      setLockedChoice('');
+      setOpponentLock('');
+      setRoundNumber(0);
+      // Navigate to arena page
+      navigate('/arena', { replace: true });
+    } catch (err) {
+      console.error('Failed to exit game:', err);
+      setStatusMessage(err.response?.data?.message || 'Failed to exit game');
+    }
+  };
+
   if (!currentGame) {
     return (
       <div className="glass-panel p-6 text-center text-white/70">
@@ -448,7 +486,15 @@ const MatchingPennies = () => {
     : 'You choose heads or tails. If you choose differently from your opponent, you win!';
 
   return (
-    <section className="glass-panel space-y-6 p-6 text-white">
+    <section className="glass-panel space-y-6 p-6 text-white relative">
+      {/* Exit Game Button - Top Right Corner */}
+      <button
+        onClick={handleExitGame}
+        className="absolute top-4 right-4 z-10 rounded-lg border border-red-500/50 bg-red-500/20 px-4 py-2 text-sm font-semibold text-red-400 hover:bg-red-500/30 hover:border-red-500/70 transition shadow-lg"
+        title="Exit Game"
+      >
+        ✕ Exit Game
+      </button>
       <header>
         <div className="flex items-center justify-between">
           <div>

@@ -586,6 +586,46 @@ const GameOfGo = () => {
     });
   };
 
+  const handleExitGame = () => {
+    if (!currentGame?.code) {
+      resetGame();
+      setSelectedGameType(null);
+      navigate('/arena', { replace: true });
+      return;
+    }
+
+    if (gamePhase === 'COMPLETE' || currentGame.status === 'COMPLETE') {
+      resetGame();
+      setSelectedGameType(null);
+      navigate('/arena', { replace: true });
+      return;
+    }
+
+    const confirmExit = window.confirm('Are you sure you want to exit the game? You will resign and your opponent will win.');
+    if (!confirmExit) return;
+
+    if (socket && isJoined) {
+      // Resign via socket
+      socket.emit('resignGo', { code: currentGame.code });
+    }
+
+    // Reset game state and navigate after a short delay to allow socket event to process
+    setTimeout(() => {
+      resetGame();
+      setSelectedGameType(null);
+      setBoard(Array(Number(currentGame?.goBoardSize) || 9).fill(null).map(() => Array(Number(currentGame?.goBoardSize) || 9).fill(null)));
+      setCurrentTurn('black');
+      setCapturedBlack(0);
+      setCapturedWhite(0);
+      setIsMyTurn(false);
+      setLastMove(null);
+      setGamePhase('PLAY');
+      setFinalScore(null);
+      setTimeInfo({ black: null, white: null });
+      navigate('/arena', { replace: true });
+    }, 500);
+  };
+
   const formatTime = (seconds) => {
     if (seconds <= 0) return '00:00';
     const mins = Math.floor(seconds / 60);
@@ -724,7 +764,15 @@ const GameOfGo = () => {
   }
 
   return (
-    <section className="glass-panel space-y-6 p-6 text-white">
+    <section className="glass-panel space-y-6 p-6 text-white relative">
+      {/* Exit Game Button - Top Right Corner */}
+      <button
+        onClick={handleExitGame}
+        className="absolute top-4 right-4 z-10 rounded-lg border border-red-500/50 bg-red-500/20 px-4 py-2 text-sm font-semibold text-red-400 hover:bg-red-500/30 hover:border-red-500/70 transition shadow-lg"
+        title="Exit Game"
+      >
+        ✕ Exit Game
+      </button>
       <header>
         <div className="flex items-center justify-between">
           <div>
