@@ -1,36 +1,46 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import api from '../services/api';
 import useAuthStore from '../store/useAuthStore';
 
 const GameHistory = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const user = useAuthStore((state) => state.user);
   const [games, setGames] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [filter, setFilter] = useState('all'); // 'all', 'complete', 'in_progress'
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  useEffect(() => {
-    const fetchGames = async () => {
-      try {
-        setLoading(true);
-        // Pass filter to backend for server-side filtering
-        const params = filter !== 'all' ? { status: filter } : {};
-        const { data } = await api.get('/games', { params });
-        const games = data.games || [];
-        // Games are already sorted by backend (-updatedAt)
-        setGames(games);
-        setError('');
-      } catch (err) {
-        setError(err.response?.data?.message || 'Failed to load game history');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchGames();
+  const fetchGames = useCallback(async () => {
+    try {
+      setLoading(true);
+      // Pass filter to backend for server-side filtering
+      const params = filter !== 'all' ? { status: filter } : {};
+      // Add timestamp to prevent caching
+      params._t = Date.now();
+      const { data } = await api.get('/games', { params });
+      const games = data.games || [];
+      // Games are already sorted by backend (completedAt, updatedAt, createdAt)
+      setGames(games);
+      setError('');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to load game history');
+    } finally {
+      setLoading(false);
+    }
   }, [filter]);
+
+  // Fetch on mount, filter change, or when navigating back to this page
+  useEffect(() => {
+    fetchGames();
+  }, [fetchGames, refreshKey]);
+
+  // Refetch when user navigates back to this page
+  useEffect(() => {
+    setRefreshKey(prev => prev + 1);
+  }, [location.key]);
 
   const formatDate = (date) => {
     if (!date) return 'N/A';
