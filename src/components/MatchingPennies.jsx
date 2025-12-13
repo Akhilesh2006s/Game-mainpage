@@ -176,11 +176,16 @@ const MatchingPennies = () => {
     if (!socket) return undefined;
 
     const handleResult = (payload) => {
+      console.log('Received penniesResult:', payload);
       setResult(payload);
       setLockedChoice('');
       setOpponentLock('');
-      timerStartedRef.current = false; // Reset timer flag when round ends
-      roundStartTimeRef.current = null; // Clear round start time
+      // Clear timer when round ends
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
+      setTimeRemaining(null);
       setScores({
         host: payload.hostScore || 0,
         guest: payload.guestScore || 0,
@@ -280,35 +285,14 @@ const MatchingPennies = () => {
       if (payload.game) {
         setCurrentGame(payload.game);
         refreshGameDetails();
-        // Auto-start timer if game just started and has time per move
-        // Only if timer hasn't been started yet (prevent duplicate calls)
-        if (payload.gameType === 'MATCHING_PENNIES' && payload.game.penniesTimePerMove && payload.game.penniesTimePerMove > 0 && socket && payload.game.code && !timerStartedRef.current) {
-          timerStartedRef.current = true;
-          // Auto-start the timer for the first round
-          socket.emit('startRound', { code: payload.game.code, gameType: 'MATCHING_PENNIES' });
-        }
+        // Timer will auto-start via useEffect when game status is IN_PROGRESS
       }
     });
     socket.on('game:error', handleError);
     
-    // Listen for server timer updates (like Game of Go)
+    // Listen for server timer updates - we use client-side timer so just log
     const handleTimerUpdate = (payload) => {
-      if (payload.timeRemaining !== undefined) {
-        // Only update if player hasn't locked their choice
-        if (!lockedChoice) {
-          // Store the most recent roundStartTime and timePerMove from server
-          // This is the authoritative source - we'll use it for local calculation
-          if (payload.roundStartTime) {
-            roundStartTimeRef.current = payload.roundStartTime;
-            timePerMoveRef.current = currentGame?.penniesTimePerMove || 20; // Default to 20 if not available
-          }
-          // The local interval will handle the smooth countdown
-        } else {
-          // Clear timer when choice is locked
-          setTimeRemaining(null);
-          roundStartTimeRef.current = null;
-        }
-      }
+      console.log('Server timer update:', payload);
     };
     socket.on('penniesTimerUpdate', handleTimerUpdate);
 
@@ -483,6 +467,7 @@ const MatchingPennies = () => {
   };
 
   const submitChoice = (choice) => {
+    console.log('submitChoice called with:', choice, 'socket:', !!socket, 'currentGame:', !!currentGame, 'isJoined:', isJoined);
     if (!socket || !currentGame || !isJoined) {
       if (!isConnected) {
         setStatusMessage('Connecting to arena...');
@@ -491,9 +476,19 @@ const MatchingPennies = () => {
       }
       return;
     }
-    if (lockedChoice) return;
-    if (roundsPlayed >= 30) return; // Game already complete (30 rounds played)
-    if (currentGame.status === 'COMPLETE') return; // Game already ended
+    if (lockedChoice) {
+      console.log('Already locked, returning');
+      return;
+    }
+    if (roundsPlayed >= 30) {
+      console.log('30 rounds played, returning');
+      return;
+    }
+    if (currentGame.status === 'COMPLETE') {
+      console.log('Game complete, returning');
+      return;
+    }
+    console.log('Emitting submitPenniesMove:', { code: currentGame.code, choice });
     setLockedChoice(choice);
     setStatusMessage('Choice locked. Waiting for your opponent...');
     socket.emit('submitPenniesMove', { code: currentGame.code, choice });
