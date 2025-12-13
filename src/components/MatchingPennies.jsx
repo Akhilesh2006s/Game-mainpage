@@ -144,8 +144,12 @@ const MatchingPennies = () => {
       return;
     }
 
-    // Start timer when game is in progress and no result yet
-    if (currentGame?.status === 'IN_PROGRESS' && !result && currentGame?.penniesTimePerMove > 0) {
+    // Start timer when game is READY or IN_PROGRESS (like RPS), both players joined, and no result yet
+    const gameReady = currentGame?.status === 'IN_PROGRESS' || currentGame?.status === 'READY';
+    const hasOpponent = currentGame?.guest;
+    const timerEnabled = currentGame?.penniesTimePerMove > 0;
+    
+    if (gameReady && hasOpponent && !result && timerEnabled && isJoined) {
       // Only start a new timer if one isn't already running
       if (!timerIntervalRef.current) {
         const startTime = currentGame.penniesTimePerMove || 20;
@@ -170,7 +174,7 @@ const MatchingPennies = () => {
         timerIntervalRef.current = null;
       }
     };
-  }, [currentGame?.status, currentGame?.penniesTimePerMove, result, roundsPlayed]);
+  }, [currentGame?.status, currentGame?.penniesTimePerMove, currentGame?.guest, result, roundsPlayed, isJoined]);
 
   useEffect(() => {
     if (!socket) return undefined;
@@ -567,7 +571,7 @@ const MatchingPennies = () => {
       </header>
 
       {/* Timer Display - Centered - shows until round completes */}
-      {timeRemaining !== null && !result && currentGame?.status === 'IN_PROGRESS' && (
+      {timeRemaining !== null && !result && (currentGame?.status === 'IN_PROGRESS' || currentGame?.status === 'READY') && currentGame?.guest && (
         <div className="text-center py-4">
           <div className={`text-6xl font-bold font-mono mb-2 transition-colors ${
             timeRemaining <= 5 ? 'text-red-500 animate-pulse' : 

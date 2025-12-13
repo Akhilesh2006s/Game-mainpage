@@ -448,6 +448,41 @@ const RockPaperScissors = () => {
     socket.emit('submitMove', { code: currentGame.code, move: choice });
   };
 
+  const handleExitGame = async () => {
+    if (!currentGame?.code) {
+      resetGame();
+      setSelectedGameType(null);
+      navigate('/arena', { replace: true });
+      return;
+    }
+
+    if (currentGame.status === 'COMPLETE') {
+      resetGame();
+      setSelectedGameType(null);
+      navigate('/arena', { replace: true });
+      return;
+    }
+
+    const confirmExit = window.confirm('Are you sure you want to exit? The game will end and your opponent wins.');
+    if (!confirmExit) return;
+
+    try {
+      await api.post('/games/end-game', { code: currentGame.code });
+      resetGame();
+      setSelectedGameType(null);
+      setResult(null);
+      setScores({ host: 0, guest: 0 });
+      setRoundsPlayed(0);
+      setLockedMove('');
+      setOpponentLock('');
+      setTimeRemaining(null);
+      navigate('/arena', { replace: true });
+    } catch (err) {
+      console.error('Failed to exit game:', err);
+      setStatusMessage(err.response?.data?.message || 'Failed to exit game');
+    }
+  };
+
   if (!currentGame) {
     return (
       <div className="glass-panel p-6 text-center text-white/70">
@@ -460,9 +495,18 @@ const RockPaperScissors = () => {
     <section className="glass-panel space-y-6 p-6 text-white">
       <header>
         <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.4em] text-white/50">Game 1</p>
-            <h3 className="text-2xl font-semibold">Rock • Paper • Scissors</h3>
+          <div className="flex items-center gap-3">
+            {/* Exit Game Button */}
+            <button
+              onClick={handleExitGame}
+              className="rounded-lg border-2 border-red-500 bg-red-600 px-3 py-1.5 text-sm font-bold text-white hover:bg-red-700 transition shadow-lg"
+            >
+              ✕ Exit
+            </button>
+            <div>
+              <p className="text-xs uppercase tracking-[0.4em] text-white/50">Game 1</p>
+              <h3 className="text-2xl font-semibold">Rock • Paper • Scissors</h3>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <div className={`h-2 w-2 rounded-full ${isConnected ? 'bg-green-400' : 'bg-red-400'}`} />
