@@ -305,7 +305,7 @@ const RockPaperScissors = () => {
     };
     socket.on('rpsTimerUpdate', handleTimerUpdate);
 
-    // Handle game ended (from resign)
+    // Handle game ended (from resign/exit)
     const handleGameEnded = (payload) => {
       if (payload.game) {
         setCurrentGame(payload.game);
@@ -314,11 +314,20 @@ const RockPaperScissors = () => {
           : payload.winner === 'guest'
             ? (payload.game.guest?.studentName || payload.game.guest?.username || 'Guest')
             : null;
-        if (winnerName) {
+        
+        // If this is a forfeit, show the disconnect modal
+        if (payload.reason === 'forfeit') {
+          const loserName = payload.winner === 'host'
+            ? (payload.game.guest?.studentName || payload.game.guest?.username || 'Opponent')
+            : (payload.game.host?.studentName || payload.game.host?.username || 'Opponent');
+          setDisconnectModal({ isOpen: true, playerName: loserName });
+          setStatusMessage(`${loserName} has left the game. You win by forfeit!`);
+        } else if (winnerName) {
           setStatusMessage(`${winnerName} wins! ${payload.winner === 'host' ? payload.game.hostScore : payload.game.guestScore} - ${payload.winner === 'host' ? payload.game.guestScore : payload.game.hostScore}`);
         } else {
           setStatusMessage('Game ended in a draw!');
         }
+        
         // Set final result for display
         setResult({
           isGameComplete: true,
@@ -330,6 +339,7 @@ const RockPaperScissors = () => {
           host: payload.game.hostScore || 0,
           guest: payload.game.guestScore || 0,
         });
+        setRoundsPlayed(30); // Mark as complete
       }
     };
 
@@ -382,7 +392,7 @@ const RockPaperScissors = () => {
       setStatusMessage(`⚠️ ${disconnectedPlayerName} has left the game and cannot return.`);
     };
 
-    // Handle game ending due to disconnect
+    // Handle game ending due to disconnect (socket disconnect)
     const handlePlayerDisconnected = (payload) => {
       if (payload.game) {
         setCurrentGame(payload.game);
@@ -391,10 +401,11 @@ const RockPaperScissors = () => {
       setStatusMessage(`${disconnectedPlayerName} has left the game and cannot return. You win by forfeit!`);
       // Show disconnect modal
       setDisconnectModal({ isOpen: true, playerName: disconnectedPlayerName });
-      // Set result to show game complete
+      // Set result to show game complete - use payload.winner (from server) or payload.remainingPlayer (from socket)
+      const winner = payload.winner || payload.remainingPlayer;
       setResult({
         isGameComplete: true,
-        winner: payload.remainingPlayer,
+        winner: winner,
         hostScore: payload.game?.hostScore || 0,
         guestScore: payload.game?.guestScore || 0,
       });
@@ -410,7 +421,6 @@ const RockPaperScissors = () => {
     socket.on('rematch:rejected', handleRematchRejected);
     socket.on('game:player_left', handlePlayerLeft); // Immediate notification
     socket.on('game:player_disconnected', handlePlayerDisconnected); // Game ended due to disconnect
-    socket.on('game:ended', handlePlayerDisconnected);
 
     return () => {
       socket.off('roundResult', handleResult);
@@ -426,7 +436,6 @@ const RockPaperScissors = () => {
       socket.off('rematch:accepted', handleRematchAccepted);
       socket.off('rematch:rejected', handleRematchRejected);
       socket.off('game:player_disconnected', handlePlayerDisconnected);
-      socket.off('game:ended', handlePlayerDisconnected);
       socket.off('rpsTimerUpdate', handleTimerUpdate);
     };
   }, [currentGame?.guest, refreshGameDetails, setStatusMessage, setCurrentGame, socket, lockedMove]);

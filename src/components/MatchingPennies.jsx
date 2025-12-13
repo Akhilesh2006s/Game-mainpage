@@ -300,7 +300,7 @@ const MatchingPennies = () => {
     };
     socket.on('penniesTimerUpdate', handleTimerUpdate);
 
-    // Handle game ended (from resign)
+    // Handle game ended (from resign/exit)
     const handleGameEnded = (payload) => {
       if (payload.game) {
         setCurrentGame(payload.game);
@@ -309,11 +309,20 @@ const MatchingPennies = () => {
           : payload.winner === 'guest'
             ? (payload.game.guest?.studentName || payload.game.guest?.username || 'Guest')
             : null;
-        if (winnerName) {
+        
+        // If this is a forfeit, show the disconnect modal
+        if (payload.reason === 'forfeit') {
+          const loserName = payload.winner === 'host'
+            ? (payload.game.guest?.studentName || payload.game.guest?.username || 'Opponent')
+            : (payload.game.host?.studentName || payload.game.host?.username || 'Opponent');
+          setDisconnectModal({ isOpen: true, playerName: loserName });
+          setStatusMessage(`${loserName} has left the game. You win by forfeit!`);
+        } else if (winnerName) {
           setStatusMessage(`${winnerName} wins! ${payload.winner === 'host' ? payload.game.hostPenniesScore : payload.game.guestPenniesScore} - ${payload.winner === 'host' ? payload.game.guestPenniesScore : payload.game.hostPenniesScore}`);
         } else {
           setStatusMessage('Game ended in a draw!');
         }
+        
         // Set final result for display
         setResult({
           isGameComplete: true,
@@ -325,6 +334,7 @@ const MatchingPennies = () => {
           host: payload.game.hostPenniesScore || 0,
           guest: payload.game.guestPenniesScore || 0,
         });
+        setRoundsPlayed(30); // Mark as complete
       }
     };
 
