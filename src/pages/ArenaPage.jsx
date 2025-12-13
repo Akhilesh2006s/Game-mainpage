@@ -427,14 +427,51 @@ const ArenaPage = () => {
             <OnlinePlayers onJoinGame={() => setActiveTab('arena')} />
           ) : (
             <>
-              {/* Greeting with Player Name */}
-              <div className="mb-4 text-center">
-                <p className="text-xl font-semibold text-white/90">
-                  {getGreeting()}, <span className="text-aurora font-bold">{playerName}</span>
-                </p>
-              </div>
-              
-              {/* Quick Join Option - Above game selection */}
+              {/* Instructions Box - At the top */}
+              {!currentGame?.code && !currentGame?.activeStage && (
+                <div className="mb-6 glass-panel p-6 border border-white/10 text-white">
+                  {/* Greeting */}
+                  <div className="mb-6">
+                    <p className="text-xl font-semibold text-white/90">
+                      {getGreeting()}, <span className="text-aurora font-bold">{playerName}</span>
+                    </p>
+                  </div>
+                  
+                  {/* Instructions */}
+                  <div>
+                    <h3 className="text-lg font-bold text-white mb-4">Instructions to Play the Game</h3>
+                    <div className="space-y-4 text-sm text-white/80">
+                      <p>There are two ways to enter the game arena.</p>
+                      
+                      <div className="border-t border-white/10 pt-4">
+                        <p className="font-semibold text-white mb-2">Option 1: Create a Game Arena</p>
+                        <ol className="list-decimal list-inside space-y-1 ml-2 text-white/70">
+                          <li>Click on the Select Game option to generate an Arena Code.</li>
+                          <li>The generated Arena Code will appear in the Online Players list.</li>
+                          <li>You may:
+                            <ul className="list-disc list-inside ml-4 mt-1 space-y-1">
+                              <li>Wait for other players to join using this code</li>
+                              <li className="font-semibold">OR</li>
+                              <li>Share the Arena Code with other players so they can join your game.</li>
+                            </ul>
+                          </li>
+                        </ol>
+                      </div>
+                      
+                      <div className="border-t border-white/10 pt-4">
+                        <p className="font-semibold text-white mb-2">Option 2: Join an Existing Game</p>
+                        <ol className="list-decimal list-inside space-y-1 ml-2 text-white/70">
+                          <li>Click on the Online Players tab.</li>
+                          <li>Filter a player or game by name, enrollment number, or Arena Code.</li>
+                          <li>Join the selected game arena.</li>
+                        </ol>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Quick Join Option - Below instructions */}
               {!currentGame?.code && !currentGame?.activeStage && (
                 <div className="mb-6 glass-panel p-4 border border-aurora/30">
                   <div className="flex items-center gap-4 flex-wrap">
