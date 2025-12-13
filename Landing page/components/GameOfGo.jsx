@@ -768,8 +768,9 @@ const GameOfGo = () => {
       {/* Exit Game Button - Top Right Corner */}
       <button
         onClick={handleExitGame}
-        className="absolute top-4 right-4 z-10 rounded-lg border border-red-500/50 bg-red-500/20 px-4 py-2 text-sm font-semibold text-red-400 hover:bg-red-500/30 hover:border-red-500/70 transition shadow-lg"
+        className="fixed top-6 right-6 z-[100] rounded-lg border-2 border-red-500/70 bg-red-500/30 px-5 py-2.5 text-sm font-bold text-white hover:bg-red-500/50 hover:border-red-500 transition shadow-xl backdrop-blur-sm"
         title="Exit Game"
+        style={{ position: 'fixed' }}
       >
         ✕ Exit Game
       </button>

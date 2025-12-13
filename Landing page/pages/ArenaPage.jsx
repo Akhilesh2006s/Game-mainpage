@@ -9,6 +9,7 @@ import UserStats from '../components/UserStats';
 import OnlinePlayers from '../components/OnlinePlayers';
 import useAuthStore from '../store/useAuthStore';
 import useGameStore from '../store/useGameStore';
+import useSocket from '../hooks/useSocket';
 import api from '../services/api';
 
 const ArenaPage = () => {
@@ -18,6 +19,12 @@ const ArenaPage = () => {
   const navigate = useNavigate();
   const [showStats, setShowStats] = useState(false);
   const [activeTab, setActiveTab] = useState('arena'); // 'arena' or 'online'
+  
+  // Socket connection for Game of Go resignation
+  const { socket, isJoined } = useSocket({
+    enabled: Boolean(currentGame?.activeStage === 'GAME_OF_GO' && currentGame?.code),
+    roomCode: currentGame?.code,
+  });
   const [goConfig, setGoConfig] = useState({
     boardSize: 9,
     timeControl: {

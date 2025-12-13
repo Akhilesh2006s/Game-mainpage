@@ -33,6 +33,8 @@ const MatchingPennies = () => {
   const [roundsPlayed, setRoundsPlayed] = useState(0);
   const [timeRemaining, setTimeRemaining] = useState(null);
   const timeRemainingRef = useRef(null);
+  const timerStartedRef = useRef(false);
+  const lastRoundNumberRef = useRef(null);
   const [rematchModal, setRematchModal] = useState({ isOpen: false, opponentName: '', requesterId: null, gameType: null, gameSettings: null });
   const [disconnectModal, setDisconnectModal] = useState({ isOpen: false, playerName: '' });
   const { socket, isConnected, isJoined } = useSocket({
@@ -140,7 +142,9 @@ const MatchingPennies = () => {
       if (payload.timeRemaining !== undefined) {
         // Only update if player hasn't locked their choice
         if (!lockedChoice) {
-          setTimeRemaining(payload.timeRemaining);
+          // Ensure timer is always a valid number and round to nearest integer
+          const time = Math.max(0, Math.floor(payload.timeRemaining));
+          setTimeRemaining(time);
         } else {
           // Clear timer when choice is locked
           setTimeRemaining(null);
@@ -159,25 +163,42 @@ const MatchingPennies = () => {
   useEffect(() => {
     if (!currentGame?.penniesTimePerMove || currentGame.penniesTimePerMove === 0) {
       setTimeRemaining(null);
+      timerStartedRef.current = false;
+      lastRoundNumberRef.current = null;
       return;
     }
 
+    const currentRoundNumber = currentGame?.penniesRoundNumber || 0;
+    const isNewRound = lastRoundNumberRef.current !== currentRoundNumber && lastRoundNumberRef.current !== null;
+
+    // Update last round number when it changes
+    if (lastRoundNumberRef.current === null || isNewRound) {
+      lastRoundNumberRef.current = currentRoundNumber;
+      // Reset timer started flag for new round
+      timerStartedRef.current = false;
+      // Clear timer to ensure fresh start
+      setTimeRemaining(null);
+    }
+
     // Start timer from first round (READY status) or when game is in progress
-    // Also restart timer when result is cleared (new round ready)
-    if (!lockedChoice && !result && isJoined && (currentGame.status === 'IN_PROGRESS' || currentGame.status === 'READY')) {
+    // Only start once per round when result is cleared and timer hasn't been started
+    if (!lockedChoice && !result && isJoined && (currentGame.status === 'IN_PROGRESS' || currentGame.status === 'READY') && !timerStartedRef.current) {
       // Notify server that round has started (server will send timer updates)
-      if (socket && currentGame?.code && !lockedChoice) {
-        // Small delay to ensure previous round timer is cleared
+      if (socket && currentGame?.code) {
+        timerStartedRef.current = true;
+        // Set initial timer to 20 to show immediately, server will update it
+        setTimeRemaining(currentGame.penniesTimePerMove);
+        // Small delay to ensure previous round timer is cleared on server
         const timerId = setTimeout(() => {
           socket.emit('startRound', { code: currentGame.code, gameType: 'MATCHING_PENNIES' });
-        }, 100);
+        }, 300);
         return () => clearTimeout(timerId);
       }
     } else if (result || lockedChoice) {
       // Clear timer when result is shown or choice is locked
       setTimeRemaining(null);
     }
-  }, [currentGame?.penniesTimePerMove, lockedChoice, result, isJoined, currentGame?.status, socket, currentGame?.code]);
+  }, [currentGame?.penniesTimePerMove, lockedChoice, result, isJoined, currentGame?.status, socket, currentGame?.code, currentGame?.penniesRoundNumber]);
 
   useEffect(() => {
     if (!socket) return undefined;
@@ -191,6 +212,11 @@ const MatchingPennies = () => {
         guest: payload.guestScore || 0,
       });
       setRoundNumber(payload.roundNumber || 0);
+      // Reset timer started flag when result is received (round ended)
+      timerStartedRef.current = false;
+      setTimeRemaining(null);
+      // Clear the last round number so next round can start fresh
+      lastRoundNumberRef.current = null;
       
       // Update rounds played from payload
       if (payload.roundsPlayed !== undefined) {
@@ -228,6 +254,10 @@ const MatchingPennies = () => {
           // Only clear if no new result has been set (check if result is still the same)
           setResult((prevResult) => {
             if (prevResult && prevResult.roundNumber === payload.roundNumber && !prevResult.isGameComplete) {
+              // Reset timer started flag when result is cleared (new round can start)
+              timerStartedRef.current = false;
+              // Reset last round number to allow new round detection
+              lastRoundNumberRef.current = null;
               return null;
             }
             return prevResult;
@@ -490,8 +520,9 @@ const MatchingPennies = () => {
       {/* Exit Game Button - Top Right Corner */}
       <button
         onClick={handleExitGame}
-        className="absolute top-4 right-4 z-10 rounded-lg border border-red-500/50 bg-red-500/20 px-4 py-2 text-sm font-semibold text-red-400 hover:bg-red-500/30 hover:border-red-500/70 transition shadow-lg"
+        className="fixed top-6 right-6 z-[100] rounded-lg border-2 border-red-500/70 bg-red-500/30 px-5 py-2.5 text-sm font-bold text-white hover:bg-red-500/50 hover:border-red-500 transition shadow-xl backdrop-blur-sm"
         title="Exit Game"
+        style={{ position: 'fixed' }}
       >
         ✕ Exit Game
       </button>
