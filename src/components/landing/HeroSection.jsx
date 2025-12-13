@@ -1,7 +1,10 @@
 import { Suspense } from 'react';
+import { useNavigate } from 'react-router-dom';
 import GoBoard3D from './GoBoard3D';
 
 export default function HeroSection() {
+  const navigate = useNavigate();
+  
   return (
     <section
       id="home"
@@ -60,15 +63,12 @@ export default function HeroSection() {
             className="animate-fade-in"
             style={{ animationDelay: '0.6s' }}
           >
-            <button className="btn-primary group">
-            <a 
-  href="https://games-frontend-vlp4.vercel.app" 
-  target="_blank" 
-  rel="noopener noreferrer"
-  className="relative z-10"
->
-  Play Now
-</a>            </button>
+            <button 
+              className="btn-primary group"
+              onClick={() => navigate('/signin')}
+            >
+              <span className="relative z-10">Play Now</span>
+            </button>
           </div>
 
           {/* Scroll indicator */}
@@ -85,3 +85,4 @@ export default function HeroSection() {
     </section>
   );
 }
+

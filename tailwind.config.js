@@ -1,8 +1,7 @@
-import type { Config } from "tailwindcss";
-
+/** @type {import('tailwindcss').Config} */
 export default {
   darkMode: ["class"],
-  content: ["./pages/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}", "./app/**/*.{ts,tsx}", "./src/**/*.{ts,tsx}"],
+  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}', '../Landing page/**/*.{ts,tsx}'],
   prefix: "",
   theme: {
     container: {
@@ -52,6 +51,12 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        // Game-specific colors (keep existing)
+        night: '#05040d',
+        nebula: '#1b163a',
+        pulse: '#ff5771',
+        aurora: '#53ffe3',
+        royal: '#5b5fff',
         neon: {
           blue: "hsl(var(--neon-blue))",
           purple: "hsl(var(--neon-purple))",
@@ -122,7 +127,11 @@ export default {
         "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
         "gradient-neon": "linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--secondary)) 50%, hsl(var(--accent)) 100%)",
       },
+      boxShadow: {
+        neon: '0 0 30px rgba(91, 95, 255, 0.35)',
+      },
     },
   },
   plugins: [require("tailwindcss-animate")],
-} satisfies Config;
+};
+
