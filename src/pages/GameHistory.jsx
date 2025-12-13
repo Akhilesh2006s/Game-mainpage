@@ -214,7 +214,8 @@ const GameHistory = () => {
                       View Analysis
                     </button>
                   )}
-                  {game.status !== 'COMPLETE' && game.guest && (
+                  {/* Only show Continue Game if game is actively in progress with both players */}
+                  {game.status === 'IN_PROGRESS' && game.guest && game.host && !game.completedAt && (
                     <button
                       onClick={() => {
                         // Set as current game and navigate to arena

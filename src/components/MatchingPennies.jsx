@@ -783,6 +783,17 @@ const MatchingPennies = () => {
         playerName={disconnectModal.playerName}
         onClose={() => {
           setDisconnectModal({ isOpen: false, playerName: '' });
+          // Reset game and navigate to arena
+          resetGame();
+          setSelectedGameType(null);
+          setResult(null);
+          setScores({ host: 0, guest: 0 });
+          setRoundsPlayed(0);
+          setLockedChoice('');
+          setOpponentLock('');
+          setRoundNumber(0);
+          setTimeRemaining(null);
+          navigate('/arena', { replace: true });
         }}
       />
     </section>
