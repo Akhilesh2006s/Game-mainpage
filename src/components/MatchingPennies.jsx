@@ -395,7 +395,7 @@ const MatchingPennies = () => {
       setStatusMessage(`⚠️ ${disconnectedPlayerName} has left the game and cannot return.`);
     };
 
-    // Handle game ending due to disconnect
+    // Handle game ending due to disconnect (socket disconnect)
     const handlePlayerDisconnected = (payload) => {
       if (payload.game) {
         setCurrentGame(payload.game);
@@ -404,10 +404,11 @@ const MatchingPennies = () => {
       setStatusMessage(`${disconnectedPlayerName} has left the game and cannot return. You win by forfeit!`);
       // Show disconnect modal
       setDisconnectModal({ isOpen: true, playerName: disconnectedPlayerName });
-      // Set result to show game complete
+      // Set result to show game complete - use payload.winner (from server) or payload.remainingPlayer (from socket)
+      const winner = payload.winner || payload.remainingPlayer;
       setResult({
         isGameComplete: true,
-        winner: payload.remainingPlayer,
+        winner: winner,
         hostScore: payload.game?.hostPenniesScore || 0,
         guestScore: payload.game?.guestPenniesScore || 0,
       });
@@ -423,7 +424,6 @@ const MatchingPennies = () => {
     socket.on('rematch:rejected', handleRematchRejected);
     socket.on('game:player_left', handlePlayerLeft); // Immediate notification
     socket.on('game:player_disconnected', handlePlayerDisconnected); // Game ended due to disconnect
-    socket.on('game:ended', handlePlayerDisconnected);
 
     return () => {
       socket.off('penniesResult', handleResult);
@@ -439,7 +439,6 @@ const MatchingPennies = () => {
       socket.off('rematch:rejected', handleRematchRejected);
       socket.off('game:player_left', handlePlayerLeft);
       socket.off('game:player_disconnected', handlePlayerDisconnected);
-      socket.off('game:ended', handlePlayerDisconnected);
       socket.off('penniesTimerUpdate', handleTimerUpdate);
     };
   }, [currentGame?.guest, refreshGameDetails, setStatusMessage, setCurrentGame, socket, isHost, currentGame, selectedGameType, setSelectedGameType, lockedChoice]);

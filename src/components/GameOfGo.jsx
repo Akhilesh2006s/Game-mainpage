@@ -993,6 +993,16 @@ const GameOfGo = () => {
         playerName={disconnectModal.playerName}
         onClose={() => {
           setDisconnectModal({ isOpen: false, playerName: '' });
+          // Reset game and navigate to arena
+          resetGame();
+          setSelectedGameType(null);
+          setBoard(Array(9).fill(null).map(() => Array(9).fill(null)));
+          setCurrentTurn('black');
+          setCapturedBlack(0);
+          setCapturedWhite(0);
+          setGamePhase('PLAY');
+          setFinalScore(null);
+          navigate('/arena', { replace: true });
         }}
       />
     </section>
