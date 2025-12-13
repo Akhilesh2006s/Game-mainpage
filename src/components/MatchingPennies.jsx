@@ -132,31 +132,36 @@ const MatchingPennies = () => {
     setOpponentStatus('Waiting for a challenger to enter your code.');
   }, [currentGame, isHost, result?.isGameComplete]);
 
-  // Simple 20-second countdown timer
+  // Simple 20-second countdown timer - keeps running until round ends (result shows)
   useEffect(() => {
-    // Clear any existing timer
-    if (timerIntervalRef.current) {
-      clearInterval(timerIntervalRef.current);
-      timerIntervalRef.current = null;
+    // Stop timer only when result is shown
+    if (result) {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
+      setTimeRemaining(null);
+      return;
     }
 
-    // Only start timer if game is in progress and no choice is locked
-    if (currentGame?.status === 'IN_PROGRESS' && !lockedChoice && !result && currentGame?.penniesTimePerMove > 0) {
-      const startTime = currentGame.penniesTimePerMove || 20;
-      setTimeRemaining(startTime);
-      
-      timerIntervalRef.current = setInterval(() => {
-        setTimeRemaining(prev => {
-          if (prev <= 1) {
-            clearInterval(timerIntervalRef.current);
-            timerIntervalRef.current = null;
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    } else {
-      setTimeRemaining(null);
+    // Start timer when game is in progress and no result yet
+    if (currentGame?.status === 'IN_PROGRESS' && !result && currentGame?.penniesTimePerMove > 0) {
+      // Only start a new timer if one isn't already running
+      if (!timerIntervalRef.current) {
+        const startTime = currentGame.penniesTimePerMove || 20;
+        setTimeRemaining(startTime);
+        
+        timerIntervalRef.current = setInterval(() => {
+          setTimeRemaining(prev => {
+            if (prev <= 1) {
+              clearInterval(timerIntervalRef.current);
+              timerIntervalRef.current = null;
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+      }
     }
 
     return () => {
@@ -165,7 +170,7 @@ const MatchingPennies = () => {
         timerIntervalRef.current = null;
       }
     };
-  }, [currentGame?.status, currentGame?.penniesTimePerMove, lockedChoice, result, roundsPlayed]);
+  }, [currentGame?.status, currentGame?.penniesTimePerMove, result, roundsPlayed]);
 
   useEffect(() => {
     if (!socket) return undefined;
@@ -566,8 +571,8 @@ const MatchingPennies = () => {
         </p>
       </header>
 
-      {/* Timer Display - Centered */}
-      {timeRemaining !== null && !lockedChoice && !result && currentGame?.status === 'IN_PROGRESS' && (
+      {/* Timer Display - Centered - shows until round completes */}
+      {timeRemaining !== null && !result && currentGame?.status === 'IN_PROGRESS' && (
         <div className="text-center py-4">
           <div className={`text-6xl font-bold font-mono mb-2 transition-colors ${
             timeRemaining <= 5 ? 'text-red-500 animate-pulse' : 
@@ -575,7 +580,9 @@ const MatchingPennies = () => {
           }`}>
             {timeRemaining}
           </div>
-          <p className="text-sm text-white/70">seconds remaining</p>
+          <p className="text-sm text-white/70">
+            {lockedChoice ? 'waiting for opponent...' : 'seconds remaining'}
+          </p>
         </div>
       )}
 
@@ -589,18 +596,6 @@ const MatchingPennies = () => {
             <p className="text-white/60">
               {lockedChoice ? `Locked ${lockedChoice.toUpperCase()}` : 'Choose heads or tails'}
             </p>
-            {/* Timer Display for You - Game of Go Style */}
-            {timeRemaining !== null && timeRemaining > 0 && !lockedChoice && (currentGame?.status === 'IN_PROGRESS' || currentGame?.status === 'READY') && (
-              <div className="mt-3 text-center">
-                <div className={`text-3xl font-bold font-mono transition-colors ${
-                  timeRemaining <= 5 
-                    ? 'text-pulse animate-pulse' 
-                    : 'text-aurora'
-                }`}>
-                  {formatDuration(timeRemaining)}
-                </div>
-              </div>
-            )}
           </div>
           <div className="flex-1 rounded-2xl border border-white/5 bg-night/20 p-4 text-center">
             <p className="text-xs uppercase tracking-[0.4em] text-white/50 mb-1">
@@ -612,18 +607,6 @@ const MatchingPennies = () => {
             <p className="text-white/60">
               {opponentLock || (currentGame?.guest ? 'Waiting for lock' : 'Opponent pending')}
             </p>
-            {/* Timer Display for Opponent - Game of Go Style */}
-            {timeRemaining !== null && timeRemaining > 0 && opponentLock === '' && (currentGame?.status === 'IN_PROGRESS' || currentGame?.status === 'READY') && currentGame?.guest && (
-              <div className="mt-3 text-center">
-                <div className={`text-3xl font-bold font-mono transition-colors ${
-                  timeRemaining <= 5 
-                    ? 'text-pulse animate-pulse' 
-                    : 'text-aurora'
-                }`}>
-                  {formatDuration(timeRemaining)}
-                </div>
-              </div>
-            )}
           </div>
         </div>
         <p className="mt-4 text-center text-sm text-white/50">{opponentStatus}</p>
