@@ -32,10 +32,6 @@ const MatchingPennies = () => {
   const [roundNumber, setRoundNumber] = useState(0);
   const [roundsPlayed, setRoundsPlayed] = useState(0);
   const [timeRemaining, setTimeRemaining] = useState(null);
-  const timeRemainingRef = useRef(null);
-  const timerStartedRef = useRef(false);
-  const roundStartTimeRef = useRef(null);
-  const timePerMoveRef = useRef(null);
   const [rematchModal, setRematchModal] = useState({ isOpen: false, opponentName: '', requesterId: null, gameType: null, gameSettings: null });
   const [disconnectModal, setDisconnectModal] = useState({ isOpen: false, playerName: '' });
   const { socket, isConnected, isJoined } = useSocket({
@@ -135,59 +131,40 @@ const MatchingPennies = () => {
     setOpponentStatus('Waiting for a challenger to enter your code.');
   }, [currentGame, isHost, result?.isGameComplete]);
 
+  // Listen for server timer updates (like Game of Go)
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleTimerUpdate = (payload) => {
+      if (payload.timeRemaining !== undefined) {
+        setTimeRemaining(payload.timeRemaining);
+      }
+    };
+
+    socket.on('penniesTimerUpdate', handleTimerUpdate);
+
+    return () => {
+      socket.off('penniesTimerUpdate', handleTimerUpdate);
+    };
+  }, [socket]);
+
   // Timer for per-move time control - request timer from server
   useEffect(() => {
     if (!currentGame?.penniesTimePerMove || currentGame.penniesTimePerMove === 0) {
       setTimeRemaining(null);
-      timerStartedRef.current = false;
-      roundStartTimeRef.current = null;
       return;
     }
 
     // Start timer from first round (READY status) or when game is in progress
     if (!lockedChoice && !result && isJoined && (currentGame.status === 'IN_PROGRESS' || currentGame.status === 'READY')) {
       // Notify server that round has started (server will send timer updates)
-      // Only emit once per round to prevent multiple timer starts
-      if (socket && currentGame?.code && !lockedChoice && !timerStartedRef.current) {
-        timerStartedRef.current = true;
+      if (socket && currentGame?.code && !lockedChoice) {
         socket.emit('startRound', { code: currentGame.code, gameType: 'MATCHING_PENNIES' });
       }
     } else {
       setTimeRemaining(null);
-      // Reset flag when round ends or choice is locked
-      if (result || lockedChoice) {
-        timerStartedRef.current = false;
-        roundStartTimeRef.current = null;
-      }
     }
   }, [currentGame?.penniesTimePerMove, lockedChoice, result, isJoined, currentGame?.status, socket, currentGame?.code]);
-
-  // Local timer interval for smooth countdown based on server's roundStartTime
-  useEffect(() => {
-    // Only run if we have roundStartTime and game is active
-    if (lockedChoice || result || !currentGame?.penniesTimePerMove) {
-      return;
-    }
-
-    // Update timer every second based on server's roundStartTime
-    const interval = setInterval(() => {
-      if (roundStartTimeRef.current && timePerMoveRef.current && !lockedChoice && !result) {
-        const elapsed = Math.floor((Date.now() - roundStartTimeRef.current) / 1000);
-        const calculatedTime = Math.max(0, timePerMoveRef.current - elapsed);
-        setTimeRemaining(calculatedTime);
-        
-        if (calculatedTime <= 0) {
-          roundStartTimeRef.current = null;
-          setTimeRemaining(0);
-        }
-      } else if (!roundStartTimeRef.current) {
-        // No active timer, clear display
-        setTimeRemaining(null);
-      }
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [lockedChoice, result, currentGame?.penniesTimePerMove]);
 
   useEffect(() => {
     if (!socket) return undefined;
@@ -196,8 +173,6 @@ const MatchingPennies = () => {
       setResult(payload);
       setLockedChoice('');
       setOpponentLock('');
-      timerStartedRef.current = false; // Reset timer flag when round ends
-      roundStartTimeRef.current = null; // Clear round start time
       setScores({
         host: payload.hostScore || 0,
         guest: payload.guestScore || 0,
@@ -298,9 +273,7 @@ const MatchingPennies = () => {
         setCurrentGame(payload.game);
         refreshGameDetails();
         // Auto-start timer if game just started and has time per move
-        // Only if timer hasn't been started yet (prevent duplicate calls)
-        if (payload.gameType === 'MATCHING_PENNIES' && payload.game.penniesTimePerMove && payload.game.penniesTimePerMove > 0 && socket && payload.game.code && !timerStartedRef.current) {
-          timerStartedRef.current = true;
+        if (payload.gameType === 'MATCHING_PENNIES' && payload.game.penniesTimePerMove && payload.game.penniesTimePerMove > 0 && socket && payload.game.code) {
           // Auto-start the timer for the first round
           socket.emit('startRound', { code: payload.game.code, gameType: 'MATCHING_PENNIES' });
         }
@@ -313,17 +286,10 @@ const MatchingPennies = () => {
       if (payload.timeRemaining !== undefined) {
         // Only update if player hasn't locked their choice
         if (!lockedChoice) {
-          // Store the most recent roundStartTime and timePerMove from server
-          // This is the authoritative source - we'll use it for local calculation
-          if (payload.roundStartTime) {
-            roundStartTimeRef.current = payload.roundStartTime;
-            timePerMoveRef.current = currentGame?.penniesTimePerMove || 20; // Default to 20 if not available
-          }
-          // The local interval will handle the smooth countdown
+          setTimeRemaining(payload.timeRemaining);
         } else {
           // Clear timer when choice is locked
           setTimeRemaining(null);
-          roundStartTimeRef.current = null;
         }
       }
     };
@@ -388,17 +354,10 @@ const MatchingPennies = () => {
         setLockedChoice('');
         setOpponentLock('');
         setRoundNumber(0);
-        setTimeRemaining(null); // Clear timer state on rematch
         setStatusMessage('Rematch started! Both players connected.');
         // Join new game room
         if (socket && payload.newCode) {
           socket.emit('joinGame', { code: payload.newCode });
-          // Auto-start timer after joining the room (wait a bit for room join to complete)
-          setTimeout(() => {
-            if (payload.game?.penniesTimePerMove && payload.game.penniesTimePerMove > 0 && socket && payload.newCode) {
-              socket.emit('startRound', { code: payload.newCode, gameType: 'MATCHING_PENNIES' });
-            }
-          }, 500);
         }
       }
     };
