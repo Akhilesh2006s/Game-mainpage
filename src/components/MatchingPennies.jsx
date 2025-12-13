@@ -132,23 +132,6 @@ const MatchingPennies = () => {
     setOpponentStatus('Waiting for a challenger to enter your code.');
   }, [currentGame, isHost, result?.isGameComplete]);
 
-  // Listen for server timer updates (like Game of Go)
-  useEffect(() => {
-    if (!socket) return;
-
-    const handleTimerUpdate = (payload) => {
-      if (payload.timeRemaining !== undefined) {
-        setTimeRemaining(payload.timeRemaining);
-      }
-    };
-
-    socket.on('penniesTimerUpdate', handleTimerUpdate);
-
-    return () => {
-      socket.off('penniesTimerUpdate', handleTimerUpdate);
-    };
-  }, [socket]);
-
   // Timer for per-move time control - request timer from server
   useEffect(() => {
     if (!currentGame?.penniesTimePerMove || currentGame.penniesTimePerMove === 0) {
