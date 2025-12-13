@@ -32,10 +32,7 @@ const MatchingPennies = () => {
   const [roundNumber, setRoundNumber] = useState(0);
   const [roundsPlayed, setRoundsPlayed] = useState(0);
   const [timeRemaining, setTimeRemaining] = useState(null);
-  const timeRemainingRef = useRef(null);
-  const timerStartedRef = useRef(false);
-  const roundStartTimeRef = useRef(null);
-  const timePerMoveRef = useRef(null);
+  const timerIntervalRef = useRef(null);
   const [rematchModal, setRematchModal] = useState({ isOpen: false, opponentName: '', requesterId: null, gameType: null, gameSettings: null });
   const [disconnectModal, setDisconnectModal] = useState({ isOpen: false, playerName: '' });
   const { socket, isConnected, isJoined } = useSocket({
@@ -135,59 +132,40 @@ const MatchingPennies = () => {
     setOpponentStatus('Waiting for a challenger to enter your code.');
   }, [currentGame, isHost, result?.isGameComplete]);
 
-  // Timer for per-move time control - request timer from server
+  // Simple 20-second countdown timer
   useEffect(() => {
-    if (!currentGame?.penniesTimePerMove || currentGame.penniesTimePerMove === 0) {
-      setTimeRemaining(null);
-      timerStartedRef.current = false;
-      roundStartTimeRef.current = null;
-      return;
+    // Clear any existing timer
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
     }
 
-    // Start timer from first round (READY status) or when game is in progress
-    if (!lockedChoice && !result && isJoined && (currentGame.status === 'IN_PROGRESS' || currentGame.status === 'READY')) {
-      // Notify server that round has started (server will send timer updates)
-      // Only emit once per round to prevent multiple timer starts
-      if (socket && currentGame?.code && !lockedChoice && !timerStartedRef.current) {
-        timerStartedRef.current = true;
-        socket.emit('startRound', { code: currentGame.code, gameType: 'MATCHING_PENNIES' });
-      }
+    // Only start timer if game is in progress and no choice is locked
+    if (currentGame?.status === 'IN_PROGRESS' && !lockedChoice && !result && currentGame?.penniesTimePerMove > 0) {
+      const startTime = currentGame.penniesTimePerMove || 20;
+      setTimeRemaining(startTime);
+      
+      timerIntervalRef.current = setInterval(() => {
+        setTimeRemaining(prev => {
+          if (prev <= 1) {
+            clearInterval(timerIntervalRef.current);
+            timerIntervalRef.current = null;
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
     } else {
       setTimeRemaining(null);
-      // Reset flag when round ends or choice is locked
-      if (result || lockedChoice) {
-        timerStartedRef.current = false;
-        roundStartTimeRef.current = null;
-      }
-    }
-  }, [currentGame?.penniesTimePerMove, lockedChoice, result, isJoined, currentGame?.status, socket, currentGame?.code]);
-
-  // Local timer interval for smooth countdown based on server's roundStartTime
-  useEffect(() => {
-    // Only run if we have roundStartTime and game is active
-    if (lockedChoice || result || !currentGame?.penniesTimePerMove) {
-      return;
     }
 
-    // Update timer every second based on server's roundStartTime
-    const interval = setInterval(() => {
-      if (roundStartTimeRef.current && timePerMoveRef.current && !lockedChoice && !result) {
-        const elapsed = Math.floor((Date.now() - roundStartTimeRef.current) / 1000);
-        const calculatedTime = Math.max(0, timePerMoveRef.current - elapsed);
-        setTimeRemaining(calculatedTime);
-        
-        if (calculatedTime <= 0) {
-          roundStartTimeRef.current = null;
-          setTimeRemaining(0);
-        }
-      } else if (!roundStartTimeRef.current) {
-        // No active timer, clear display
-        setTimeRemaining(null);
+    return () => {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
       }
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [lockedChoice, result, currentGame?.penniesTimePerMove]);
+    };
+  }, [currentGame?.status, currentGame?.penniesTimePerMove, lockedChoice, result, roundsPlayed]);
 
   useEffect(() => {
     if (!socket) return undefined;
@@ -463,6 +441,42 @@ const MatchingPennies = () => {
     };
   }, [currentGame?.guest, refreshGameDetails, setStatusMessage, setCurrentGame, socket, isHost, currentGame, selectedGameType, setSelectedGameType, lockedChoice]);
 
+  const handleExitGame = async () => {
+    if (!currentGame?.code) {
+      resetGame();
+      setSelectedGameType(null);
+      navigate('/arena', { replace: true });
+      return;
+    }
+
+    if (currentGame.status === 'COMPLETE') {
+      resetGame();
+      setSelectedGameType(null);
+      navigate('/arena', { replace: true });
+      return;
+    }
+
+    const confirmExit = window.confirm('Are you sure you want to exit? The game will end and your opponent wins.');
+    if (!confirmExit) return;
+
+    try {
+      await api.post('/end-game', { code: currentGame.code });
+      resetGame();
+      setSelectedGameType(null);
+      setResult(null);
+      setScores({ host: 0, guest: 0 });
+      setRoundsPlayed(0);
+      setLockedChoice('');
+      setOpponentLock('');
+      setRoundNumber(0);
+      setTimeRemaining(null);
+      navigate('/arena', { replace: true });
+    } catch (err) {
+      console.error('Failed to exit game:', err);
+      setStatusMessage(err.response?.data?.message || 'Failed to exit game');
+    }
+  };
+
   const submitChoice = (choice) => {
     if (!socket || !currentGame || !isJoined) {
       if (!isConnected) {
@@ -496,9 +510,18 @@ const MatchingPennies = () => {
     <section className="glass-panel space-y-6 p-6 text-white">
       <header>
         <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.4em] text-white/50">Game 3</p>
-            <h3 className="text-2xl font-semibold">Matching Pennies</h3>
+          <div className="flex items-center gap-4">
+            {/* Exit Game Button */}
+            <button
+              onClick={handleExitGame}
+              className="rounded-lg border-2 border-red-500 bg-red-600 px-3 py-1.5 text-sm font-bold text-white hover:bg-red-700 transition shadow-lg"
+            >
+              ✕ Exit
+            </button>
+            <div>
+              <p className="text-xs uppercase tracking-[0.4em] text-white/50">Game 3</p>
+              <h3 className="text-2xl font-semibold">Matching Pennies</h3>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <div className={`h-2 w-2 rounded-full ${isConnected ? 'bg-green-400' : 'bg-red-400'}`} />
@@ -542,6 +565,19 @@ const MatchingPennies = () => {
           {statusMessage || opponentStatus}
         </p>
       </header>
+
+      {/* Timer Display - Centered */}
+      {timeRemaining !== null && !lockedChoice && !result && currentGame?.status === 'IN_PROGRESS' && (
+        <div className="text-center py-4">
+          <div className={`text-6xl font-bold font-mono mb-2 transition-colors ${
+            timeRemaining <= 5 ? 'text-red-500 animate-pulse' : 
+            timeRemaining <= 10 ? 'text-yellow-400' : 'text-green-400'
+          }`}>
+            {timeRemaining}
+          </div>
+          <p className="text-sm text-white/70">seconds remaining</p>
+        </div>
+      )}
 
       <div className="rounded-3xl border border-white/10 bg-white/5 p-6 text-white">
         <div className="flex flex-col gap-6 md:flex-row md:items-stretch md:justify-between">
