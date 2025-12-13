@@ -32,6 +32,7 @@ const MatchingPennies = () => {
   const [roundNumber, setRoundNumber] = useState(0);
   const [roundsPlayed, setRoundsPlayed] = useState(0);
   const [timeRemaining, setTimeRemaining] = useState(null);
+  const timeRemainingRef = useRef(null);
   const [rematchModal, setRematchModal] = useState({ isOpen: false, opponentName: '', requesterId: null, gameType: null, gameSettings: null });
   const [disconnectModal, setDisconnectModal] = useState({ isOpen: false, playerName: '' });
   const { socket, isConnected, isJoined } = useSocket({
@@ -137,7 +138,13 @@ const MatchingPennies = () => {
 
     const handleTimerUpdate = (payload) => {
       if (payload.timeRemaining !== undefined) {
-        setTimeRemaining(payload.timeRemaining);
+        // Only update if player hasn't locked their choice
+        if (!lockedChoice) {
+          setTimeRemaining(payload.timeRemaining);
+        } else {
+          // Clear timer when choice is locked
+          setTimeRemaining(null);
+        }
       }
     };
 
@@ -146,7 +153,7 @@ const MatchingPennies = () => {
     return () => {
       socket.off('penniesTimerUpdate', handleTimerUpdate);
     };
-  }, [socket]);
+  }, [socket, lockedChoice]);
 
   // Timer for per-move time control - request timer from server
   useEffect(() => {
@@ -156,12 +163,18 @@ const MatchingPennies = () => {
     }
 
     // Start timer from first round (READY status) or when game is in progress
+    // Also restart timer when result is cleared (new round ready)
     if (!lockedChoice && !result && isJoined && (currentGame.status === 'IN_PROGRESS' || currentGame.status === 'READY')) {
       // Notify server that round has started (server will send timer updates)
       if (socket && currentGame?.code && !lockedChoice) {
-        socket.emit('startRound', { code: currentGame.code, gameType: 'MATCHING_PENNIES' });
+        // Small delay to ensure previous round timer is cleared
+        const timerId = setTimeout(() => {
+          socket.emit('startRound', { code: currentGame.code, gameType: 'MATCHING_PENNIES' });
+        }, 100);
+        return () => clearTimeout(timerId);
       }
-    } else {
+    } else if (result || lockedChoice) {
+      // Clear timer when result is shown or choice is locked
       setTimeRemaining(null);
     }
   }, [currentGame?.penniesTimePerMove, lockedChoice, result, isJoined, currentGame?.status, socket, currentGame?.code]);
@@ -281,20 +294,6 @@ const MatchingPennies = () => {
     });
     socket.on('game:error', handleError);
     
-    // Listen for server timer updates (like Game of Go)
-    const handleTimerUpdate = (payload) => {
-      if (payload.timeRemaining !== undefined) {
-        // Only update if player hasn't locked their choice
-        if (!lockedChoice) {
-          setTimeRemaining(payload.timeRemaining);
-        } else {
-          // Clear timer when choice is locked
-          setTimeRemaining(null);
-        }
-      }
-    };
-    socket.on('penniesTimerUpdate', handleTimerUpdate);
-
     // Handle game ended (from resign)
     const handleGameEnded = (payload) => {
       if (payload.game) {
@@ -354,10 +353,17 @@ const MatchingPennies = () => {
         setLockedChoice('');
         setOpponentLock('');
         setRoundNumber(0);
+        setTimeRemaining(null); // Clear timer state on rematch
         setStatusMessage('Rematch started! Both players connected.');
         // Join new game room
         if (socket && payload.newCode) {
           socket.emit('joinGame', { code: payload.newCode });
+          // Auto-start timer after joining the room (wait a bit for room join to complete)
+          setTimeout(() => {
+            if (payload.game?.penniesTimePerMove && payload.game.penniesTimePerMove > 0 && socket && payload.newCode) {
+              socket.emit('startRound', { code: payload.newCode, gameType: 'MATCHING_PENNIES' });
+            }
+          }, 500);
         }
       }
     };
@@ -409,7 +415,6 @@ const MatchingPennies = () => {
       socket.off('rematch:rejected', handleRematchRejected);
       socket.off('game:player_disconnected', handlePlayerDisconnected);
       socket.off('game:ended', handlePlayerDisconnected);
-      socket.off('penniesTimerUpdate', handleTimerUpdate);
     };
   }, [currentGame?.guest, refreshGameDetails, setStatusMessage, setCurrentGame, socket, isHost, currentGame, selectedGameType, setSelectedGameType, lockedChoice]);
 
