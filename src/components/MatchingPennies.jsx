@@ -449,7 +449,7 @@ const MatchingPennies = () => {
     if (!confirmExit) return;
 
     try {
-      await api.post('/end-game', { code: currentGame.code });
+      await api.post('/games/end-game', { code: currentGame.code });
       resetGame();
       setSelectedGameType(null);
       setResult(null);

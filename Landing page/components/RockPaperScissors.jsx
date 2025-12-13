@@ -459,7 +459,7 @@ const RockPaperScissors = () => {
 
     try {
       // End the game via API
-      await api.post('/end-game', { code: currentGame.code });
+      await api.post('/games/end-game', { code: currentGame.code });
       // Reset game state
       resetGame();
       setSelectedGameType(null);
