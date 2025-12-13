@@ -34,6 +34,8 @@ const MatchingPennies = () => {
   const [timeRemaining, setTimeRemaining] = useState(null);
   const timeRemainingRef = useRef(null);
   const timerStartedRef = useRef(false);
+  const roundStartTimeRef = useRef(null);
+  const timePerMoveRef = useRef(null);
   const [rematchModal, setRematchModal] = useState({ isOpen: false, opponentName: '', requesterId: null, gameType: null, gameSettings: null });
   const [disconnectModal, setDisconnectModal] = useState({ isOpen: false, playerName: '' });
   const { socket, isConnected, isJoined } = useSocket({
@@ -138,6 +140,7 @@ const MatchingPennies = () => {
     if (!currentGame?.penniesTimePerMove || currentGame.penniesTimePerMove === 0) {
       setTimeRemaining(null);
       timerStartedRef.current = false;
+      roundStartTimeRef.current = null;
       return;
     }
 
@@ -154,9 +157,37 @@ const MatchingPennies = () => {
       // Reset flag when round ends or choice is locked
       if (result || lockedChoice) {
         timerStartedRef.current = false;
+        roundStartTimeRef.current = null;
       }
     }
   }, [currentGame?.penniesTimePerMove, lockedChoice, result, isJoined, currentGame?.status, socket, currentGame?.code]);
+
+  // Local timer interval for smooth countdown based on server's roundStartTime
+  useEffect(() => {
+    // Only run if we have roundStartTime and game is active
+    if (lockedChoice || result || !currentGame?.penniesTimePerMove) {
+      return;
+    }
+
+    // Update timer every second based on server's roundStartTime
+    const interval = setInterval(() => {
+      if (roundStartTimeRef.current && timePerMoveRef.current && !lockedChoice && !result) {
+        const elapsed = Math.floor((Date.now() - roundStartTimeRef.current) / 1000);
+        const calculatedTime = Math.max(0, timePerMoveRef.current - elapsed);
+        setTimeRemaining(calculatedTime);
+        
+        if (calculatedTime <= 0) {
+          roundStartTimeRef.current = null;
+          setTimeRemaining(0);
+        }
+      } else if (!roundStartTimeRef.current) {
+        // No active timer, clear display
+        setTimeRemaining(null);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [lockedChoice, result, currentGame?.penniesTimePerMove]);
 
   useEffect(() => {
     if (!socket) return undefined;
@@ -166,6 +197,7 @@ const MatchingPennies = () => {
       setLockedChoice('');
       setOpponentLock('');
       timerStartedRef.current = false; // Reset timer flag when round ends
+      roundStartTimeRef.current = null; // Clear round start time
       setScores({
         host: payload.hostScore || 0,
         guest: payload.guestScore || 0,
@@ -266,7 +298,9 @@ const MatchingPennies = () => {
         setCurrentGame(payload.game);
         refreshGameDetails();
         // Auto-start timer if game just started and has time per move
-        if (payload.gameType === 'MATCHING_PENNIES' && payload.game.penniesTimePerMove && payload.game.penniesTimePerMove > 0 && socket && payload.game.code) {
+        // Only if timer hasn't been started yet (prevent duplicate calls)
+        if (payload.gameType === 'MATCHING_PENNIES' && payload.game.penniesTimePerMove && payload.game.penniesTimePerMove > 0 && socket && payload.game.code && !timerStartedRef.current) {
+          timerStartedRef.current = true;
           // Auto-start the timer for the first round
           socket.emit('startRound', { code: payload.game.code, gameType: 'MATCHING_PENNIES' });
         }
@@ -279,10 +313,17 @@ const MatchingPennies = () => {
       if (payload.timeRemaining !== undefined) {
         // Only update if player hasn't locked their choice
         if (!lockedChoice) {
-          setTimeRemaining(payload.timeRemaining);
+          // Store the most recent roundStartTime and timePerMove from server
+          // This is the authoritative source - we'll use it for local calculation
+          if (payload.roundStartTime) {
+            roundStartTimeRef.current = payload.roundStartTime;
+            timePerMoveRef.current = currentGame?.penniesTimePerMove || 20; // Default to 20 if not available
+          }
+          // The local interval will handle the smooth countdown
         } else {
           // Clear timer when choice is locked
           setTimeRemaining(null);
+          roundStartTimeRef.current = null;
         }
       }
     };
