@@ -783,6 +783,58 @@ const AdminDashboard = () => {
                     >
                       🔒 Lock All RPS & Pennies
                     </button>
+                    <button
+                      onClick={async () => {
+                        if (window.confirm('Are you sure you want to unlock Game of Go for all users matching the current filters?')) {
+                          try {
+                            setLoading(true);
+                            await api.post('/admin/unlock-all-go', {
+                              groupId: gameAccessSelectedGroup !== 'all' ? gameAccessSelectedGroup : undefined,
+                              classroomNumber: gameAccessSelectedClassroom !== 'all' ? gameAccessSelectedClassroom : undefined,
+                              teamNumber: gameAccessSelectedTeam !== 'all' ? gameAccessSelectedTeam : undefined,
+                              search: gameAccessSearchQuery || undefined,
+                              unlock: true,
+                            });
+                            await fetchGameAccess();
+                            setError('');
+                          } catch (err) {
+                            setError(err.response?.data?.message || 'Failed to unlock Game of Go');
+                          } finally {
+                            setLoading(false);
+                          }
+                        }
+                      }}
+                      disabled={loading}
+                      className="px-4 py-2 rounded-lg bg-blue-500/20 text-blue-400 border border-blue-500/50 hover:bg-blue-500/30 transition font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      🔓 Unlock All Game of Go
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (window.confirm('Are you sure you want to lock Game of Go for all users matching the current filters?')) {
+                          try {
+                            setLoading(true);
+                            await api.post('/admin/unlock-all-go', {
+                              groupId: gameAccessSelectedGroup !== 'all' ? gameAccessSelectedGroup : undefined,
+                              classroomNumber: gameAccessSelectedClassroom !== 'all' ? gameAccessSelectedClassroom : undefined,
+                              teamNumber: gameAccessSelectedTeam !== 'all' ? gameAccessSelectedTeam : undefined,
+                              search: gameAccessSearchQuery || undefined,
+                              unlock: false,
+                            });
+                            await fetchGameAccess();
+                            setError('');
+                          } catch (err) {
+                            setError(err.response?.data?.message || 'Failed to lock Game of Go');
+                          } finally {
+                            setLoading(false);
+                          }
+                        }
+                      }}
+                      disabled={loading}
+                      className="px-4 py-2 rounded-lg bg-red-500/20 text-red-400 border border-red-500/50 hover:bg-red-500/30 transition font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      🔒 Lock All Game of Go
+                    </button>
                   </>
                 )}
               </div>
